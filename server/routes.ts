@@ -102,7 +102,18 @@ export function setupRoutes(app: Express) {
     try {
       const { podcast, category, limit = "20", offset = "0" } = req.query;
       
-      let query = db
+      // Build where conditions dynamically
+      const conditions = [eq(products.isActive, true)];
+      
+      if (podcast) {
+        conditions.push(eq(products.podcastId, podcast as string));
+      }
+      
+      if (category) {
+        conditions.push(eq(products.category, category as string));
+      }
+      
+      const allProducts = await db
         .select({
           id: products.id,
           name: products.name,
@@ -125,22 +136,11 @@ export function setupRoutes(app: Express) {
         })
         .from(products)
         .leftJoin(podcasts, eq(products.podcastId, podcasts.id))
-        .where(eq(products.isActive, true))
+        .where(and(...conditions))
         .orderBy(desc(products.createdAt))
         .limit(parseInt(limit as string))
         .offset(parseInt(offset as string));
-
-      let baseQuery = query;
       
-      if (podcast) {
-        baseQuery = baseQuery.where(eq(products.podcastId, podcast as string));
-      }
-      
-      if (category) {
-        baseQuery = baseQuery.where(eq(products.category, category as string));
-      }
-      
-      const allProducts = await baseQuery;
       res.json(allProducts);
     } catch (error) {
       console.error("Error fetching products:", error);
