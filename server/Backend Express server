@@ -1,6 +1,6 @@
 import express from "express";
 import { setupVite, serveStatic } from "./vite.js";
-import { setupAuth } from "./replitAuth.js";
+import { setupAuth } from "./Complete database operations interfacereplitAuth.js";
 import { setupRoutes } from "./routes.js";
 
 const app = express();
