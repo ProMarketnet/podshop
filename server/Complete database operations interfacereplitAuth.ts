@@ -1,12 +1,12 @@
-import { Express } from "express";
+import { Express, Request, Response, NextFunction } from "express";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
-import { db } from "./storage.js";
+import { db } from "./server/storage.js";
 import { users, sessions } from "@shared/schema.js";
 import { eq } from "drizzle-orm";
 import { neonConfig, Pool } from "@neondatabase/serverless";
 import ws from "ws";
-import { Client, generators, Issuer } from "openid-client";
+import * as openid from "openid-client";
 
 const PgSession = connectPgSimple(session);
 
@@ -15,7 +15,7 @@ neonConfig.webSocketConstructor = ws;
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
-export interface AuthenticatedRequest extends Express.Request {
+export interface AuthenticatedRequest extends Request {
   user?: {
     id: string;
     email: string | null;
@@ -24,6 +24,15 @@ export interface AuthenticatedRequest extends Express.Request {
     profileImageUrl: string | null;
     role: string | null;
   };
+}
+
+// Helper function to get base URL
+function getBaseUrl(): string {
+  const protocol = process.env.NODE_ENV === "production" ? "https" : "http";
+  const host = process.env.RAILWAY_PUBLIC_DOMAIN || 
+               process.env.REPL_SLUG ? `${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co` :
+               "localhost:5000";
+  return `${protocol}://${host}`;
 }
 
 export async function setupAuth(app: Express) {
@@ -194,4 +203,13 @@ export function requireAuth(req: AuthenticatedRequest, res: Express.Response, ne
 export function requireAdmin(req: AuthenticatedRequest, res: Express.Response, next: Express.NextFunction) {
   requireAuth(req, res, async () => {
     if (!req.user) {
-      return res.status(401).
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    next();
+  });
+}
